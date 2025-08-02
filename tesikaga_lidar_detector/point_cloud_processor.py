@@ -87,17 +87,31 @@ class PointCloudProcessor:
             print_progress=False
         ))
 
-        # クラスタごとに色分けされたデバッグ用点群を作成
         max_label = labels.max()
         if max_label < 0:
-             return np.array([]), o3d.geometry.PointCloud()
+            return np.array([]), o3d.geometry.PointCloud()
 
-        colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
-        colors[labels < 0] = 0  # ノイズは黒
+        # --- Matplotlib依存の排除 ---
+        # 固定カラーマップを定義
+        DEBUG_COLORS = np.array([
+            [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [1.0, 1.0, 0.0],
+            [0.0, 1.0, 1.0], [1.0, 0.0, 1.0], [0.8, 0.6, 0.4], [0.6, 0.8, 0.4],
+            [0.4, 0.6, 0.8], [0.8, 0.4, 0.6], [1.0, 0.5, 0.0], [0.0, 0.5, 1.0],
+            [0.5, 1.0, 0.0], [0.5, 0.0, 1.0], [1.0, 0.0, 0.5], [0.0, 1.0, 0.5],
+            [0.7, 0.7, 0.7], [0.5, 0.2, 0.2], [0.2, 0.5, 0.2], [0.2, 0.2, 0.5]
+        ])
         
+        # 各点に色を割り当て (ノイズは黒)
+        colors = np.zeros((len(labels), 3))
+        non_noise_indices = labels >= 0
+        if np.any(non_noise_indices):
+            color_indices = labels[non_noise_indices] % len(DEBUG_COLORS)
+            colors[non_noise_indices] = DEBUG_COLORS[color_indices]
+        # --------------------------
+
         clustered_cloud = o3d.geometry.PointCloud()
         clustered_cloud.points = pcd.points
-        clustered_cloud.colors = o3d.utility.Vector3dVector(colors[:, :3])
+        clustered_cloud.colors = o3d.utility.Vector3dVector(colors)
 
         # 有効なクラスタの重心を計算
         valid_centroids = []

@@ -6,17 +6,16 @@ from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
-    # 設定ファイルのパスを取得
     config = os.path.join(
         get_package_share_directory('tesikaga_lidar_detector'),
         'config',
         'detector_params.yaml'
     )
 
-    # Launch引数を宣言
+    # Launch引数のデフォルト値を '/unilidar/cloud' に変更
     point_cloud_topic_arg = DeclareLaunchArgument(
         'point_cloud_topic',
-        default_value='point_cloud',
+        default_value='/unilidar/cloud', # <--- ここを変更！
         description='Topic name for the input PointCloud2'
     )
 
@@ -28,6 +27,8 @@ def generate_launch_description():
             name='tesikaga_detector',
             parameters=[config],
             remappings=[
+                # このremappings設定により、ノード内の'~/input/point_cloud'が
+                # launchファイルで指定されたトピック名に自動的に接続される
                 ('~/input/point_cloud', LaunchConfiguration('point_cloud_topic'))
             ],
             output='screen'

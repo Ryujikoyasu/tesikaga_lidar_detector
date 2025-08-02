@@ -1,0 +1,30 @@
+# requirements.txt
+
+# --- Core Dependencies ---
+
+# 高速な数値計算と配列操作に必須
+numpy
+
+matplotlib
+
+# 点群処理のコアライブラリ (フィルタリング、クラスタリング等)
+open3d
+
+# 設定ファイル(.yaml)の読み書きに使用
+PyYAML
+
+# 座標変換行列の計算スクリプト(calibrate_transform.py)で使用
+opencv-python
+
+
+# --- Development & Testing Dependencies (Optional but Recommended) ---
+# package.xmlの<test_depend>に基づき、コード品質を保つためのツール
+
+# コードのスタイルチェッカー
+flake8
+
+# docstringのスタイルチェッカー
+pydocstyle
+
+# ユニットテストの実行フレームワーク
+pytest

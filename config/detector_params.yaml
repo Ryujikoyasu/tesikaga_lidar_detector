@@ -1,8 +1,8 @@
 tesikaga_detector:
   ros__parameters:
     # 検出範囲 (メートル単位)
-    min_distance: 1.0
-    max_distance: 15.0
+    min_distance: 0.3
+    max_distance: 1.0
 
     # 地面とみなす高さの閾値 (メートル単位)
     ground_removal_height: 0.15
