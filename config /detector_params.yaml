@@ -1,0 +1,33 @@
+tesikaga_detector:
+  ros__parameters:
+    # 検出範囲 (メートル単位)
+    min_distance: 1.0
+    max_distance: 15.0
+
+    # 地面とみなす高さの閾値 (メートル単位)
+    ground_removal_height: 0.15
+
+    # ダウンサンプリングの解像度 (メートル単位)
+    # 小さいほど高解像度だが処理が重くなる
+    voxel_leaf_size: 0.05
+
+    # 背景キャプチャ設定
+    background_capture_duration: 3.0 # この秒数間、点群を平均化して背景を作る
+
+    # 背景差分の閾値 (メートル単位)
+    # 背景モデルからこの距離以上離れていたら「前景」とみなす
+    background_subtraction_threshold: 0.1
+
+    # クラスタリング設定 (DBSCAN)
+    cluster_tolerance: 0.5  # 同じ物体とみなす点同士の最大距離 (メートル)
+    min_cluster_size: 20    # クラスタを構成する最小の点数 (子供やペットを想定)
+    max_cluster_size: 800   # クラスタを構成する最大の点数 (壁などの誤検出を除去)
+    
+    # UDP送信設定
+    target_ip: "127.0.0.1" # main_real.pyを実行するPCのIPアドレス
+    target_port: 9999
+    
+    # 固定フレームID
+    fixed_frame_id: "world"
+
+    transform_matrix_file: "transform_matrix.yaml"
