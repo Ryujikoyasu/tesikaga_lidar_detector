@@ -10,15 +10,15 @@ class UdpSender:
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._logger.info(f"UDP sender configured for {self._ip}:{self._port}")
 
-    def send_centroids(self, centroids: np.ndarray):
-        """重心座標のnumpy配列をバイト列に変換して送信する。"""
-        if centroids.size == 0:
+    def send_data(self, data: np.ndarray):
+        """numpy配列をバイト列に変換して送信する。"""
+        if data.size == 0:
             return
         
         try:
             # 配列をfloat32型のバイト列に変換
-            data = centroids.astype(np.float32).tobytes()
-            self._sock.sendto(data, (self._ip, self._port))
+            payload = data.astype(np.float32).tobytes()
+            self._sock.sendto(payload, (self._ip, self._port))
         except Exception as e:
             self._logger.error(f"Failed to send UDP packet: {e}")
 

@@ -19,7 +19,7 @@ class PointCloudProcessor:
         self.background_model = pcd
         self._logger.info(f"Background model set with {len(pcd.points)} points.")
 
-    def process_frame(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, Dict[str, o3d.geometry.PointCloud]):
+    def process_frame(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
         """
         単一フレームの点群を処理し、重心座標とデバッグ用点群を返す。
         """
@@ -34,20 +34,20 @@ class PointCloudProcessor:
         debug_clouds['filtered'] = pcd_filtered
 
         if self.background_model is None:
-            return np.array([]), debug_clouds
+            return np.array([]), np.array([]), debug_clouds
 
         # 3. 背景差分
         pcd_foreground = self._subtract_background(pcd_filtered)
         debug_clouds['foreground'] = pcd_foreground
 
         if not pcd_foreground.has_points():
-            return np.array([]), debug_clouds
+            return np.array([]), np.array([]), debug_clouds
 
         # 4. クラスタリング
-        centroids, clustered_cloud = self._get_clusters(pcd_foreground)
+        centroids, sizes, clustered_cloud = self._get_clusters(pcd_foreground)
         debug_clouds['clustered'] = clustered_cloud
 
-        return centroids, debug_clouds
+        return centroids, sizes, debug_clouds
 
     def _filter_by_distance_and_height(self, pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
         """距離と高さで点群をフィルタリングする。"""
@@ -78,8 +78,8 @@ class PointCloudProcessor:
         
         return pcd.select_by_index(foreground_indices)
 
-    def _get_clusters(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, o3d.geometry.PointCloud):
-        """DBSCANでクラスタリングし、有効なクラスタの重心を計算する。"""
+    def _get_clusters(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, np.ndarray, o3d.geometry.PointCloud):
+        """DBSCANでクラスタリングし、有効なクラスタの重心とサイズを計算する。"""
         # DBSCANを実行
         labels = np.array(pcd.cluster_dbscan(
             eps=self._params['cluster_tolerance'],
@@ -89,7 +89,7 @@ class PointCloudProcessor:
 
         max_label = labels.max()
         if max_label < 0:
-            return np.array([]), o3d.geometry.PointCloud()
+            return np.array([]), np.array([]), o3d.geometry.PointCloud()
 
         # --- Matplotlib依存の排除 ---
         # 固定カラーマップを定義
@@ -113,8 +113,9 @@ class PointCloudProcessor:
         clustered_cloud.points = pcd.points
         clustered_cloud.colors = o3d.utility.Vector3dVector(colors)
 
-        # 有効なクラスタの重心を計算
+        # 有効なクラスタの重心とサイズを計算
         valid_centroids = []
+        valid_sizes = []
         unique_labels = np.unique(labels)
         for label in unique_labels:
             if label == -1: continue # -1はノイズ
@@ -125,6 +126,13 @@ class PointCloudProcessor:
             if len(cluster_indices) <= self._params['max_cluster_size']:
                 cluster_points = np.asarray(pcd.points)[cluster_indices]
                 centroid = np.mean(cluster_points, axis=0)
+                
+                # AABB (Axis-Aligned Bounding Box) からサイズを計算
+                aabb = o3d.geometry.AxisAlignedBoundingBox.create_from_points(o3d.utility.Vector3dVector(cluster_points))
+                extent = aabb.get_extent()
+                size = np.linalg.norm(extent[:2]) # XY平面の対角線の長さをサイズとする
+
                 valid_centroids.append(centroid)
+                valid_sizes.append(size)
         
-        return np.array(valid_centroids), clustered_cloud
+        return np.array(valid_centroids), np.array(valid_sizes), clustered_cloud

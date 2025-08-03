@@ -10,6 +10,7 @@ import numpy as np
 # ★タスク3：重心をPointCloud2に変換するために追加
 from .ros_utils import pointcloud2_to_open3d, open3d_to_pointcloud2
 from .point_cloud_processor import PointCloudProcessor
+from .udp_sender import UdpSender
 
 class ObjectClusterDetectorNode(Node):
     """
@@ -22,6 +23,7 @@ class ObjectClusterDetectorNode(Node):
         params = self._get_parameters_as_dict()
 
         self.processor = PointCloudProcessor(params, self.get_logger())
+        self.udp_sender = UdpSender(params['target_ip'], params['target_port'], self.get_logger())
         
         self.is_capturing = False
         self.captured_point_clouds = []
@@ -112,7 +114,16 @@ class ObjectClusterDetectorNode(Node):
                 return
 
             # ★タスク3： process_frameの返り値をすべて受け取る
-            centroids, debug_clouds = self.processor.process_frame(pcd_raw)
+            centroids, sizes, debug_clouds = self.processor.process_frame(pcd_raw)
+
+            # --- UDP送信処理 ---
+            if centroids.size > 0:
+                # [centroid_x, centroid_y, size] の形式にデータを整形
+                data_to_send = np.hstack([
+                    centroids[:, :2], # centroid_x, centroid_y
+                    sizes.reshape(-1, 1) # size
+                ])
+                self.udp_sender.send_data(data_to_send.flatten())
 
             # --- デバッグ用Publish処理 ---
             if 'filtered' in debug_clouds and debug_clouds['filtered'].has_points():
@@ -145,6 +156,8 @@ def main(args=None):
     except KeyboardInterrupt:
         pass
     finally:
+        if node.udp_sender:
+            node.udp_sender.close()
         node.destroy_node()
         rclpy.shutdown()
 
