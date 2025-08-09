@@ -29,6 +29,7 @@ setup(
     entry_points={
         'console_scripts': [
             'detector_node = tesikaga_lidar_detector.object_cluster_detector_node:main',
+            'calibration_node = tesikaga_lidar_detector.calibration_node:main',
         ],
     },
 )

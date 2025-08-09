@@ -1,0 +1,8 @@
+# srv/TriggerCalibration.srv
+
+# リクエストは空。サービスを呼ぶこと自体がトリガーとなる。
+---
+# 成功したかどうかを返す
+bool success
+# 結果メッセージ（成功 or 失敗理由）
+string message

@@ -19,8 +19,17 @@ tesikaga_detector:
     background_subtraction_threshold: 0.1
 
     # クラスタリング設定 (DBSCAN)
-    cluster_tolerance: 0.5  # 同じ物体とみなす点同士の最大距離 (メートル)
-    min_cluster_size: 20    # クラスタを構成する最小の点数 (子供やペットを想定)
+        # DBSCAN: 半径 (m)
+    dbscan_eps: 0.5
+    # DBSCAN: クラスターを構成する最小の点数
+    dbscan_min_points: 5
+
+    # キャリブレーション用マーカーの理想座標 (ワールド座標系)
+    # pond_radius は launch ファイルから渡されるため、ここではシンボルとして定義
+    calibration_markers:
+      - ["pond_radius", 0.0]
+      - ["-pond_radius", 0.0]
+      - [0.0, "pond_radius"]
     max_cluster_size: 800   # クラスタを構成する最大の点数 (壁などの誤検出を除去)
     
     # UDP送信設定
