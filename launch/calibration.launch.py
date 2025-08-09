@@ -29,7 +29,7 @@ def generate_launch_description():
             package='tesikaga_lidar_detector',
             executable='detector_node',
             name='tesikaga_detector',
-            parameters=[detector_config],
+            parameters=[detector_config, {'calibration_mode': True}],
             output='screen'
         ),
         

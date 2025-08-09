@@ -19,7 +19,7 @@ class PointCloudProcessor:
         self.background_model = pcd
         self._logger.info(f"Background model set with {len(pcd.points)} points.")
 
-    def process_frame(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
+    def process_frame(self, pcd: o3d.geometry.PointCloud, cluster_params: dict) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
         """
         単一フレームの点群を処理し、重心座標とデバッグ用点群を返す。
         """
@@ -78,12 +78,12 @@ class PointCloudProcessor:
         
         return pcd.select_by_index(foreground_indices)
 
-    def _get_clusters(self, pcd: o3d.geometry.PointCloud) -> (np.ndarray, np.ndarray, o3d.geometry.PointCloud):
+    def _get_clusters(self, pcd: o3d.geometry.PointCloud, cluster_params: dict) -> (np.ndarray, np.ndarray, o3d.geometry.PointCloud):
         """DBSCANでクラスタリングし、有効なクラスタの重心とサイズを計算する。"""
         # DBSCANを実行
         labels = np.array(pcd.cluster_dbscan(
-            eps=self._params['cluster_tolerance'],
-            min_points=self._params['min_cluster_size'],
+            eps=cluster_params['tolerance'],
+            min_points=cluster_params['min_size'],
             print_progress=False
         ))
 
@@ -123,7 +123,7 @@ class PointCloudProcessor:
             cluster_indices = np.where(labels == label)[0]
             
             # クラスタサイズのフィルタリング
-            if len(cluster_indices) <= self._params['max_cluster_size']:
+            if cluster_params['min_size'] <= len(cluster_indices) <= cluster_params['max_size']:
                 cluster_points = np.asarray(pcd.points)[cluster_indices]
                 centroid = np.mean(cluster_points, axis=0)
                 

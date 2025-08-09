@@ -25,7 +25,7 @@ def generate_launch_description():
             package='tesikaga_lidar_detector',
             executable='detector_node',
             name='tesikaga_detector',
-            parameters=[config],
+            parameters=[config, {'calibration_mode': False}],
             remappings=[
                 # このremappings設定により、ノード内の'~/input/point_cloud'が
                 # launchファイルで指定されたトピック名に自動的に接続される

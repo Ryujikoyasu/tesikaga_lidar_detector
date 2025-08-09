@@ -20,10 +20,26 @@ class ObjectClusterDetectorNode(Node):
         super().__init__('tesikaga_detector')
 
         self._declare_parameters()
+        # The original params are used by the processor for non-clustering tasks
         params = self._get_parameters_as_dict()
 
         self.processor = PointCloudProcessor(params, self.get_logger())
         self.udp_sender = UdpSender(params['target_ip'], params['target_port'], self.get_logger())
+
+        # --- Clustering parameters ---
+        self.is_calibration_mode = self.get_parameter('calibration_mode').get_parameter_value().bool_value
+
+        self.cluster_params_production = {
+            'tolerance': self.get_parameter('cluster_tolerance').get_parameter_value().double_value,
+            'min_size': self.get_parameter('min_cluster_size').get_parameter_value().integer_value,
+            'max_size': self.get_parameter('max_cluster_size').get_parameter_value().integer_value,
+        }
+        
+        self.cluster_params_calibration = {
+            'tolerance': self.get_parameter('calibration_cluster.tolerance').get_parameter_value().double_value,
+            'min_size': self.get_parameter('calibration_cluster.min_size').get_parameter_value().integer_value,
+            'max_size': self.get_parameter('calibration_cluster.max_size').get_parameter_value().integer_value,
+        }
         
         self.is_capturing = False
         self.captured_point_clouds = []
@@ -66,8 +82,12 @@ class ObjectClusterDetectorNode(Node):
                 ('cluster_tolerance', 0.5), ('min_cluster_size', 20), ('max_cluster_size', 800),
                 ('target_ip', '127.0.0.1'), ('target_port', 9999),
                 ('transform_matrix_file', 'transform_matrix.yaml'),
-                ('fixed_frame_id', 'world')
+                ('fixed_frame_id', 'world'),
+                ('calibration_mode', False),
             ])
+        self.declare_parameter('calibration_cluster.min_size', 5)
+        self.declare_parameter('calibration_cluster.max_size', 25)
+        self.declare_parameter('calibration_cluster.tolerance', 0.1)
         
     def _get_parameters_as_dict(self):
         params_list = self.get_parameters_by_prefix('').values()
@@ -113,8 +133,12 @@ class ObjectClusterDetectorNode(Node):
                 self.get_logger().info(f"Capturing... ({len(self.captured_point_clouds)} frames)", throttle_duration_sec=1.0)
                 return
 
-            # ★タスク3： process_frameの返り値をすべて受け取る
-            centroids, sizes, debug_clouds = self.processor.process_frame(pcd_raw)
+            if self.is_calibration_mode:
+                active_cluster_params = self.cluster_params_calibration
+            else:
+                active_cluster_params = self.cluster_params_production
+
+            centroids, sizes, debug_clouds = self.processor.process_frame(pcd_raw, active_cluster_params)
 
             # --- UDP送信処理 ---
             if centroids.size > 0:
