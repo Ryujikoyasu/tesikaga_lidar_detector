@@ -14,17 +14,8 @@ def generate_launch_description():
         'detector_params.yaml'
     )
     
-    # Launch引数として池の半径を受け取れるようにする
-    pond_radius_arg = DeclareLaunchArgument(
-        'pond_radius',
-        default_value='3.0',
-        description='Radius of the pond in meters for calibration.'
-    )
-
     return LaunchDescription([
-        pond_radius_arg,
-        
-        # 1. 検出ノード
+        # 1. 検出ノード (キャリブレーションモードで起動)
         Node(
             package='tesikaga_lidar_detector',
             executable='detector_node',
@@ -33,12 +24,12 @@ def generate_launch_description():
             output='screen'
         ),
         
-        # 2. キャリブレーションノード
+        # 2. キャリブレーションノード (検出ノードと同じ設定ファイルを読み込む)
         Node(
             package='tesikaga_lidar_detector',
             executable='calibration_node',
             name='tesikaga_calibrator',
-            parameters=[{'pond_radius': LaunchConfiguration('pond_radius')}],
+            parameters=[detector_config],
             output='screen'
         ),
     ])

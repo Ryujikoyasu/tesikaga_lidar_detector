@@ -7,49 +7,47 @@ class PointCloudProcessor:
     点群処理のコアロジックを責務として持つ。
     ROSに依存せず、Open3DとNumPyのみで完結する。
     """
-    def __init__(self, params: dict, logger):
-        self._params = params
+    def __init__(self, logger):
         self._logger = logger
         self.background_model: Optional[o3d.geometry.PointCloud] = None
         self._logger.info("Point cloud processor initialized.")
-        self._logger.info(f"Parameters: {self._params}")
 
     def set_background(self, pcd: o3d.geometry.PointCloud):
         """背景モデルを設定する。"""
         self.background_model = pcd
         self._logger.info(f"Background model set with {len(pcd.points)} points.")
 
-    def process_frame(self, pcd: o3d.geometry.PointCloud, cluster_params: dict) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
+    def process_frame(self, pcd: o3d.geometry.PointCloud, voxel_leaf_size: float, cluster_params: dict, filter_params: dict) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
         """
         単一フレームの点群を処理し、重心座標とデバッグ用点群を返す。
         """
         debug_clouds = {}
 
-        # 1. ダウンサンプリング
-        pcd_downsampled = pcd.voxel_down_sample(self._params['voxel_leaf_size'])
+        # 1. ダウンサンプリング (★引数で渡されたvoxel_leaf_sizeを使用)
+        pcd_downsampled = pcd.voxel_down_sample(voxel_leaf_size)
         debug_clouds['downsampled'] = pcd_downsampled
 
         # 2. 領域フィルタリング
-        pcd_filtered = self._filter_by_distance_and_height(pcd_downsampled)
+        pcd_filtered = self._filter_by_distance_and_height(pcd_downsampled, filter_params)
         debug_clouds['filtered'] = pcd_filtered
 
         if self.background_model is None:
             return np.array([]), np.array([]), debug_clouds
 
         # 3. 背景差分
-        pcd_foreground = self._subtract_background(pcd_filtered)
+        pcd_foreground = self._subtract_background(pcd_filtered, filter_params['background_subtraction_threshold'])
         debug_clouds['foreground'] = pcd_foreground
 
         if not pcd_foreground.has_points():
             return np.array([]), np.array([]), debug_clouds
 
         # 4. クラスタリング
-        centroids, sizes, clustered_cloud = self._get_clusters(pcd_foreground)
+        centroids, sizes, clustered_cloud = self._get_clusters(pcd_foreground, cluster_params)
         debug_clouds['clustered'] = clustered_cloud
 
         return centroids, sizes, debug_clouds
 
-    def _filter_by_distance_and_height(self, pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    def _filter_by_distance_and_height(self, pcd: o3d.geometry.PointCloud, filter_params: dict) -> o3d.geometry.PointCloud:
         """距離と高さで点群をフィルタリングする。"""
         points = np.asarray(pcd.points)
         
@@ -57,14 +55,14 @@ class PointCloudProcessor:
         distances = np.linalg.norm(points[:, :2], axis=1) # XY平面での距離
         
         # フィルタリング条件
-        dist_mask = (distances >= self._params['min_distance']) & (distances <= self._params['max_distance'])
-        height_mask = points[:, 2] > self._params['ground_removal_height']
+        dist_mask = (distances >= filter_params['min_distance']) & (distances <= filter_params['max_distance'])
+        height_mask = points[:, 2] > filter_params['ground_removal_height']
         
         combined_mask = dist_mask & height_mask
         
         return pcd.select_by_index(np.where(combined_mask)[0])
 
-    def _subtract_background(self, pcd: o3d.geometry.PointCloud) -> o3d.geometry.PointCloud:
+    def _subtract_background(self, pcd: o3d.geometry.PointCloud, threshold: float) -> o3d.geometry.PointCloud:
         """背景モデルとの距離を計算し、前景を抽出する。"""
         if self.background_model is None or not pcd.has_points():
             return o3d.geometry.PointCloud()
@@ -74,7 +72,7 @@ class PointCloudProcessor:
         dists = np.asarray(dists)
         
         # 閾値より遠い点（=前景）のみを抽出
-        foreground_indices = np.where(dists > self._params['background_subtraction_threshold'])[0]
+        foreground_indices = np.where(dists > threshold)[0]
         
         return pcd.select_by_index(foreground_indices)
 

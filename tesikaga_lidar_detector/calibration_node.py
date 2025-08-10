@@ -19,30 +19,28 @@ class CalibrationNode(Node):
         
         # パラメータ宣言
         self.declare_parameter('pond_radius', 3.0)
-        self.declare_parameter('calibration_markers', Parameter.Type.STRING_ARRAY,
-                               descriptor=rclpy.parameter.ParameterDescriptor(description="List of strings representing marker coordinates, e.g., '[\"pond_radius\", 0.0]'"))
+        # calibration_markersはYAMLから直接リストとして読み込まれる
+        self.declare_parameter('calibration_markers', rclpy.Parameter.Type.DOUBLE_ARRAY_ARRAY)
         
         # 変数初期化
         self.latest_centroids = np.array([])
         self.pond_radius = self.get_parameter('pond_radius').get_parameter_value().double_value
         
-        # YAMLから理想座標を読み込み、動的に構築する
+        # パラメータから理想座標を読み込む
         try:
-            raw_markers = self.get_parameter('calibration_markers').get_parameter_value().string_array_value
-            self.pts_world_ideal = np.array([
-                [eval(p.replace("pond_radius", str(self.pond_radius))) for p in row.strip('[]').split(',')]
-                for row in raw_markers
-            ], dtype=np.float32)
-            self.get_logger().info(f"Ideal world marker points loaded:\n{self.pts_world_ideal}")
+            # rcl_interfaces.msg.ParameterValue(type=12, double_array_value=[3.0, 0.0, -3.0, 0.0, 0.0, 3.0])
+            # のような形式で返ってくるので、2次元に変換する
+            marker_values = self.get_parameter('calibration_markers').get_parameter_value().double_array_value
+            self.pts_world_ideal = np.array(marker_values).reshape(-1, 2)
+            self.get_logger().info(f"Ideal world marker points loaded from params:
+{self.pts_world_ideal}")
         except Exception as e:
-            self.get_logger().error(f"Failed to parse 'calibration_markers' parameter: {e}")
-            # フォールバックとしてハードコードされた値を使用
-            self.get_logger().warn("Falling back to hardcoded ideal marker points.")
-            self.pts_world_ideal = np.array([
-                [self.pond_radius, 0.0],
-                [-self.pond_radius, 0.0],
-                [0.0, self.pond_radius]
-            ], dtype=np.float32)
+            self.get_logger().fatal(f"Failed to get or parse 'calibration_markers' parameter: {e}")
+            self.get_logger().fatal("This is a critical error. Please check your detector_params.yaml. Shutting down.")
+            # 致命的なエラーなのでノードを終了させる
+            self.destroy_node()
+            rclpy.shutdown()
+            return
 
         # サブスクライバ
         self.centroid_sub = self.create_subscription(
