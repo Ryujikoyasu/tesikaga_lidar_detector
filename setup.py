@@ -1,4 +1,3 @@
-# setup.py (最終改訂版)
 import os
 from glob import glob
 from setuptools import setup, find_packages
@@ -8,9 +7,6 @@ package_name = 'tesikaga_lidar_detector'
 setup(
     name=package_name,
     version='0.1.0',
-    # パッケージのディレクトリ構造を明示的に指定
-    package_dir={'': '.'}, 
-    # find_packages()は現在の場所からパッケージを探す
     packages=find_packages(where='.'),
     data_files=[
         ('share/ament_index/resource_index/packages',
@@ -30,7 +26,7 @@ setup(
         'console_scripts': [
             'detector_node = tesikaga_lidar_detector.object_cluster_detector_node:main',
             'calibration_node = tesikaga_lidar_detector.calibration_node:main',
-            'run_calibration = scripts.run_calibration:main',
+            'run_calibration = tesikaga_lidar_detector.scripts.run_calibration:main',
         ],
     },
 )
