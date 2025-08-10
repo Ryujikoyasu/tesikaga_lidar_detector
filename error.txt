@@ -1,0 +1,23 @@
+ros2 launch tesikaga_lidar_detector trigger_calibration.launch.py
+[INFO] [launch]: All log files can be found below /home/ryuddi/.ros/log/2025-08-10-17-26-31-733734-ryuddi-18765
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [run_calibration-1]: process started with pid [18766]
+[run_calibration-1] Traceback (most recent call last):
+[run_calibration-1]   File "/home/ryuddi/ros2_ws/install/tesikaga_lidar_detector/lib/tesikaga_lidar_detector/run_calibration", line 33, in <module>
+[run_calibration-1]     sys.exit(load_entry_point('tesikaga-lidar-detector==0.1.0', 'console_scripts', 'run_calibration')())
+[run_calibration-1]   File "/home/ryuddi/ros2_ws/install/tesikaga_lidar_detector/lib/tesikaga_lidar_detector/run_calibration", line 25, in importlib_load_entry_point
+[run_calibration-1]     return next(matches).load()
+[run_calibration-1]   File "/usr/lib/python3.10/importlib/metadata/__init__.py", line 171, in load
+[run_calibration-1]     module = import_module(match.group('module'))
+[run_calibration-1]   File "/usr/lib/python3.10/importlib/__init__.py", line 126, in import_module
+[run_calibration-1]     return _bootstrap._gcd_import(name[level:], package, level)
+[run_calibration-1]   File "<frozen importlib._bootstrap>", line 1050, in _gcd_import
+[run_calibration-1]   File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+[run_calibration-1]   File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+[run_calibration-1]   File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+[run_calibration-1]   File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+[run_calibration-1]   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+[run_calibration-1]   File "/home/ryuddi/ros2_ws/install/tesikaga_lidar_detector/lib/python3.10/site-packages/tesikaga_lidar_detector/scripts/run_calibration.py", line 8, in <module>
+[run_calibration-1]     from tesikaga_lidar_detector.srv import TriggerCalibration
+[run_calibration-1] ModuleNotFoundError: No module named 'tesikaga_lidar_detector.srv'
+[ERROR] [run_calibration-1]: process has died [pid 18766, exit code 1, cmd '/home/ryuddi/ros2_ws/install/tesikaga_lidar_detector/lib/tesikaga_lidar_detector/run_calibration --ros-args -r __node:=calibration_client_node'].
