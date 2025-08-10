@@ -1,55 +1,23 @@
 tesikaga_detector:
   ros__parameters:
-    # 検出範囲 (メートル単位)
+    calibration_mode: true
     min_distance: 0.3
     max_distance: 1.0
-
-    # 地面とみなす高さの閾値 (メートル単位)
     ground_removal_height: 0.15
-
-    # --- 本番用パラメータ ---
-    voxel_leaf_size: 0.05               # 人間検出には5cmで十分
+    voxel_leaf_size: 0.05
     cluster_tolerance: 0.5
     min_cluster_size: 20
     max_cluster_size: 800
-    
-    # --- キャリブレーション用パラメータ ---
-    calibration_voxel_leaf_size: 0.03   # ペットボトル検出には3cmで高精度化
+    background_capture_duration: 3.0
+    background_subtraction_threshold: 0.1
+    calibration_voxel_leaf_size: 0.03
     calibration_cluster:
       min_size: 5
       max_size: 25
       tolerance: 0.1
-
-    # 背景キャプチャ設定
-    background_capture_duration: 3.0 # この秒数間、点群を平均化して背景を作る
-
-    # 背景差分の閾値 (メートル単位)
-    # 背景モデルからこの距離以上離れていたら「前景」とみなす
-    background_subtraction_threshold: 0.1
-
-    # --- 本番用クラスタリング設定 (人間を想定) ---
-    cluster_tolerance: 0.5
-    min_cluster_size: 20
-    max_cluster_size: 800
-
-    # --- ★キャリブレーション用クラスタリング設定 (ペットボトルを想定) ---
-    calibration_cluster:
-      min_size: 5     # ペットボトルは人間より小さい
-      max_size: 25    # ペットボトルより大きいものは無視
-      tolerance: 0.1  # より厳密にクラスタを形成
-
-    # キャリブレーション用マーカーの理想座標 (ワールド座標系)
-    pond_radius: 3.0 # 池の半径
-    calibration_markers:
-      - [3.0, 0.0]
-      - [-3.0, 0.0]
-      - [0.0, 3.0]
-    
-    # UDP送信設定
-    target_ip: "127.0.0.1" # main_real.pyを実行するPCのIPアドレス
+    pond_radius: 0.5
+    calibration_markers: [0.5, 0.0, -0.5, 0.0, 0.0, 0.5]
+    target_ip: "127.0.0.1"
     target_port: 9999
-    
-    # 固定フレームID
     fixed_frame_id: "world"
-
     transform_matrix_file: "transform_matrix.yaml"

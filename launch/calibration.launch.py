@@ -15,12 +15,11 @@ def generate_launch_description():
     )
     
     return LaunchDescription([
-        # 1. 検出ノード (キャリブレーションモードで起動)
         Node(
             package='tesikaga_lidar_detector',
             executable='detector_node',
             name='tesikaga_detector',
-            parameters=[detector_config, {'calibration_mode': True}],
+            parameters=[detector_config],
             output='screen'
         ),
         

@@ -19,8 +19,8 @@ class CalibrationNode(Node):
         
         # パラメータ宣言
         self.declare_parameter('pond_radius', 3.0)
-        # calibration_markersはYAMLから直接リストとして読み込まれる
-        self.declare_parameter('calibration_markers', rclpy.Parameter.Type.DOUBLE_ARRAY_ARRAY)
+        # ★ ROS2のYAMLパーサーの制約を回避するため、フラットなリストとして読み込む
+        self.declare_parameter('calibration_markers', rclpy.Parameter.Type.DOUBLE_ARRAY)
         
         # 変数初期化
         self.latest_centroids = np.array([])
@@ -28,12 +28,10 @@ class CalibrationNode(Node):
         
         # パラメータから理想座標を読み込む
         try:
-            # rcl_interfaces.msg.ParameterValue(type=12, double_array_value=[3.0, 0.0, -3.0, 0.0, 0.0, 3.0])
-            # のような形式で返ってくるので、2次元に変換する
+            # フラットなリスト [x1, y1, x2, y2, ...] を (N, 2) の形状に変換
             marker_values = self.get_parameter('calibration_markers').get_parameter_value().double_array_value
             self.pts_world_ideal = np.array(marker_values).reshape(-1, 2)
-            self.get_logger().info(f"Ideal world marker points loaded from params:
-{self.pts_world_ideal}")
+            self.get_logger().info(f"Ideal world marker points loaded from params:\n{self.pts_world_ideal}")
         except Exception as e:
             self.get_logger().fatal(f"Failed to get or parse 'calibration_markers' parameter: {e}")
             self.get_logger().fatal("This is a critical error. Please check your detector_params.yaml. Shutting down.")
@@ -84,12 +82,23 @@ class CalibrationNode(Node):
             # アフィン変換行列を生成
             transform_matrix = get_affine_transform_matrix(theta_rad, t_vec)
             
+            # --- ★リファクタリングポイント ---
+            # YAMLに保存するデータを構築
+            output_data = {
+                'lidar_pose': {
+                    'position_xy': t_vec.tolist(),
+                    'rotation_z_deg': np.rad2deg(theta_rad)
+                },
+                'transformation_matrix': transform_matrix.tolist()
+            }
+            
             # ファイルに保存
-            package_share_dir = get_package_share_directory('tesikaga_lidar_detector')
-            output_path = os.path.join(package_share_dir, 'config', 'transform_matrix.yaml')
+            package_path = get_package_share_directory('tesikaga_lidar_detector')
+            output_path = os.path.join(package_path, 'config', 'transform_matrix.yaml')
             
             with open(output_path, 'w') as f:
-                yaml.dump({'transformation_matrix': transform_matrix.tolist()}, f, default_flow_style=False, indent=2)
+                # yaml.dump に indent をつけると、より人間が読みやすい形式になる
+                yaml.dump(output_data, f, indent=2, sort_keys=False)
 
             response.success = True
             response.message = (f"Calibration successful! LiDAR Pose calculated:\n"
