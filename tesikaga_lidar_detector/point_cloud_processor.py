@@ -127,10 +127,8 @@ class PointCloudProcessor:
                 cluster_points = np.asarray(pcd.points)[cluster_indices]
                 centroid = np.mean(cluster_points, axis=0)
                 
-                # AABB (Axis-Aligned Bounding Box) からサイズを計算
-                aabb = o3d.geometry.AxisAlignedBoundingBox.create_from_points(o3d.utility.Vector3dVector(cluster_points))
-                extent = aabb.get_extent()
-                size = np.linalg.norm(extent[:2]) # XY平面の対角線の長さをサイズとする
+                # サイズをクラスタを構成する点の数として計算
+                size = len(cluster_indices)
 
                 valid_centroids.append(centroid)
                 valid_sizes.append(size)
