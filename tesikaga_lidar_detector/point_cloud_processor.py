@@ -17,13 +17,13 @@ class PointCloudProcessor:
         self.background_model = pcd
         self._logger.info(f"Background model set with {len(pcd.points)} points.")
 
-    def process_frame(self, pcd: o3d.geometry.PointCloud, voxel_leaf_size: float, cluster_params: dict, filter_params: dict) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
+    def preprocess_and_get_foreground(self, pcd: o3d.geometry.PointCloud, voxel_leaf_size: float, filter_params: dict) -> (o3d.geometry.PointCloud, Dict[str, o3d.geometry.PointCloud]):
         """
-        単一フレームの点群を処理し、重心座標とデバッグ用点群を返す。
+        点群の前処理（ダウンサンプリング、フィルタリング、背景差分）を行い、前景点群を返す。
         """
         debug_clouds = {}
 
-        # 1. ダウンサンプリング (★引数で渡されたvoxel_leaf_sizeを使用)
+        # 1. ダウンサンプリング
         pcd_downsampled = pcd.voxel_down_sample(voxel_leaf_size)
         debug_clouds['downsampled'] = pcd_downsampled
 
@@ -32,16 +32,25 @@ class PointCloudProcessor:
         debug_clouds['filtered'] = pcd_filtered
 
         if self.background_model is None:
-            return np.array([]), np.array([]), debug_clouds
+            # 背景モデルがない場合は、フィルタリング後の点群をそのまま前景として扱う
+            return pcd_filtered, debug_clouds
 
         # 3. 背景差分
         pcd_foreground = self._subtract_background(pcd_filtered, filter_params['background_subtraction_threshold'])
         debug_clouds['foreground'] = pcd_foreground
+        
+        return pcd_foreground, debug_clouds
+
+    def find_clusters(self, pcd_foreground: o3d.geometry.PointCloud, cluster_params: dict) -> (np.ndarray, np.ndarray, Dict[str, o3d.geometry.PointCloud]):
+        """
+        与えられた点群からクラスタを検出し、重心、サイズ、デバッグ用点群を返す。
+        """
+        debug_clouds = {}
 
         if not pcd_foreground.has_points():
             return np.array([]), np.array([]), debug_clouds
 
-        # 4. クラスタリング
+        # クラスタリング
         centroids, sizes, clustered_cloud = self._get_clusters(pcd_foreground, cluster_params)
         debug_clouds['clustered'] = clustered_cloud
 

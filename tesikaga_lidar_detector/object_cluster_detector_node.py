@@ -54,6 +54,7 @@ class ObjectClusterDetectorNode(Node):
             'ground_removal_height': self.get_parameter('ground_removal_height').get_parameter_value().double_value,
             'background_subtraction_threshold': self.get_parameter('background_subtraction_threshold').get_parameter_value().double_value,
         }
+        self.get_logger().info(f"Loaded max_distance: {self.filter_params['max_distance']}")
         
         # --- ProcessorとSenderの初期化 ---
         self.processor = PointCloudProcessor(self.get_logger())
@@ -62,6 +63,11 @@ class ObjectClusterDetectorNode(Node):
             self.get_parameter('target_port').get_parameter_value().integer_value,
             self.get_logger()
         )
+        
+        # --- 前景点群の蓄積用設定 ---
+        self.accumulation_duration = self.get_parameter('accumulation_duration').get_parameter_value().double_value
+        self.foreground_buffer = []
+        self.last_process_time = self.get_clock().now()
         
         self.is_capturing = False
         self.captured_point_clouds = []
@@ -85,7 +91,7 @@ class ObjectClusterDetectorNode(Node):
         self.declare_parameters(
             namespace='',
             parameters=[
-                ('min_distance', 0.3), ('max_distance', 1.0),
+                ('min_distance', 0.3), ('max_distance', 10.0),
                 ('ground_removal_height', 0.15),
                 ('background_capture_duration', 3.0),
                 ('background_subtraction_threshold', 0.1),
@@ -93,6 +99,7 @@ class ObjectClusterDetectorNode(Node):
                 ('transform_matrix_file', 'transform_matrix.yaml'),
                 ('fixed_frame_id', 'world'),
                 ('calibration_mode', False),
+                ('accumulation_duration', 1.0),
                 # --- 本番用パラメータ ---
                 ('voxel_leaf_size', 0.05),
                 ('cluster_tolerance', 0.5),
@@ -141,42 +148,58 @@ class ObjectClusterDetectorNode(Node):
         try:
             pcd_raw = pointcloud2_to_open3d(msg)
 
+            # 背景キャプチャモードの場合は、以前のロジックを実行
             if self.is_capturing:
-                # キャプチャ中も本番用の解像度でダウンサンプリング
                 pcd_to_capture = pcd_raw.voxel_down_sample(self.voxel_size_production)
                 self.captured_point_clouds.append(pcd_to_capture)
                 self.get_logger().info(f"Capturing... ({len(self.captured_point_clouds)} frames)", throttle_duration_sec=1.0)
                 return
 
-            # --- ★モードに応じて使用するパラメータセットを決定 ---
-            if self.is_calibration_mode:
-                active_voxel_size = self.voxel_size_calibration
-                active_cluster_params = self.cluster_params_calibration
-            else:
-                active_voxel_size = self.voxel_size_production
-                active_cluster_params = self.cluster_params_production
+            # --- 1. 前景抽出 ---
+            active_voxel_size = self.voxel_size_calibration if self.is_calibration_mode else self.voxel_size_production
             
-            # --- ★決定したパラメータセットをprocessorに渡す ---
-            centroids, sizes, debug_clouds = self.processor.process_frame(
-                pcd_raw, 
-                active_voxel_size, 
-                active_cluster_params,
-                self.filter_params
+            foreground_pcd, debug_pre_clouds = self.processor.preprocess_and_get_foreground(
+                pcd_raw, active_voxel_size, self.filter_params
             )
-            
-            # --- UDP送信処理 ---
+
+            if foreground_pcd.has_points():
+                self.foreground_buffer.append(foreground_pcd)
+
+            # --- 2. 時間ベースでの蓄積と処理 ---
+            now = self.get_clock().now()
+            if (now - self.last_process_time).nanoseconds / 1e9 < self.accumulation_duration:
+                return # まだ処理する時間ではない
+
+            self.last_process_time = now # 処理時間を更新
+
+            if not self.foreground_buffer:
+                return
+
+            # --- 3. 蓄積した点群を結合 ---
+            combined_pcd = o3d.geometry.PointCloud()
+            for pcd in self.foreground_buffer:
+                combined_pcd += pcd
+            self.foreground_buffer = [] # バッファをクリア
+
+            self.get_logger().info(f"Processing {len(combined_pcd.points)} accumulated points.")
+
+            # --- 4. クラスタリング ---
+            active_cluster_params = self.cluster_params_calibration if self.is_calibration_mode else self.cluster_params_production
+            centroids, sizes, debug_cluster_clouds = self.processor.find_clusters(combined_pcd, active_cluster_params)
+
+            # --- 5. UDP送信とデバッグ情報のPublish ---
             if centroids.size > 0:
                 data_to_send = np.hstack([centroids[:, :2], sizes.reshape(-1, 1)])
                 self.udp_sender.send_data(data_to_send.flatten())
 
-            # --- デバッグ用Publish処理 ---
             header = msg.header
-            if 'filtered' in debug_clouds and debug_clouds['filtered'].has_points():
-                self.pub_debug_filtered.publish(open3d_to_pointcloud2(debug_clouds['filtered'], header.frame_id, header.stamp))
-            if 'foreground' in debug_clouds and debug_clouds['foreground'].has_points():
-                self.pub_debug_foreground.publish(open3d_to_pointcloud2(debug_clouds['foreground'], header.frame_id, header.stamp))
-            if 'clustered' in debug_clouds and debug_clouds['clustered'].has_points():
-                self.pub_debug_clustered.publish(open3d_to_pointcloud2(debug_clouds['clustered'], header.frame_id, header.stamp))
+            if 'filtered' in debug_pre_clouds and debug_pre_clouds['filtered'].has_points():
+                self.pub_debug_filtered.publish(open3d_to_pointcloud2(debug_pre_clouds['filtered'], header.frame_id, header.stamp))
+            if 'foreground' in debug_pre_clouds and debug_pre_clouds['foreground'].has_points():
+                self.pub_debug_foreground.publish(open3d_to_pointcloud2(debug_pre_clouds['foreground'], header.frame_id, header.stamp))
+            
+            if 'clustered' in debug_cluster_clouds and debug_cluster_clouds['clustered'].has_points():
+                self.pub_debug_clustered.publish(open3d_to_pointcloud2(debug_cluster_clouds['clustered'], header.frame_id, header.stamp))
             if centroids.size > 0:
                 centroid_pcd = o3d.geometry.PointCloud()
                 centroid_pcd.points = o3d.utility.Vector3dVector(centroids)

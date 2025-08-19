@@ -1,23 +1,24 @@
 tesikaga_detector:
   ros__parameters:
     calibration_mode: true
-    min_distance: 0.3
-    max_distance: 1.0
+    min_distance: 1.2
+    max_distance: 9.0
     ground_removal_height: 0.15
-    voxel_leaf_size: 0.05
+    voxel_leaf_size: 0.02
     cluster_tolerance: 0.5
-    min_cluster_size: 20
+    min_cluster_size: 10
     max_cluster_size: 800
     background_capture_duration: 3.0
     background_subtraction_threshold: 0.1
-    calibration_voxel_leaf_size: 0.03
+    calibration_voxel_leaf_size: 0.02
     calibration_cluster:
-      min_size: 5
-      max_size: 25
+      min_size: 10
+      max_size: 800
       tolerance: 0.1
-    pond_radius: 0.5
-    calibration_markers: [0.5, 0.0, -0.5, 0.0, 0.0, 0.5]
+    # pond_radius: 0.5
+    calibration_markers: [3.15, 0.0, -3.15, 0.0, 0.0, 2.65]
     target_ip: "127.0.0.1"
     target_port: 9999
     fixed_frame_id: "world"
     transform_matrix_file: "transform_matrix.yaml"
+    accumulation_duration: 1.0
