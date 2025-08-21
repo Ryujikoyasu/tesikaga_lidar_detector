@@ -4,17 +4,17 @@ tesikaga_detector:
     min_distance: 1.2
     max_distance: 9.0
     ground_removal_height: 0.15
-    voxel_leaf_size: 0.02
-    cluster_tolerance: 0.5
-    min_cluster_size: 10
+    voxel_leaf_size: 0.05
+    cluster_tolerance: 0.3
+    min_cluster_size: 30
     max_cluster_size: 800
     background_capture_duration: 3.0
-    background_subtraction_threshold: 0.1
-    calibration_voxel_leaf_size: 0.02
+    background_subtraction_threshold: 0.2
+    calibration_voxel_leaf_size: 0.05
     calibration_cluster:
-      min_size: 10
+      min_size: 30
       max_size: 800
-      tolerance: 0.1
+      tolerance: 0.3
     # pond_radius: 0.5
     calibration_markers: [3.15, 0.0, -3.15, 0.0, 0.0, 2.65]
     target_ip: "127.0.0.1"
