@@ -22,3 +22,7 @@ tesikaga_detector:
     fixed_frame_id: "world"
     transform_matrix_file: "transform_matrix.yaml"
     accumulation_duration: 1.0
+
+tesikaga_calibrator:
+  ros__parameters:
+    calibration_markers: [3.15, 0.0, -3.15, 0.0, 0.0, 2.65]

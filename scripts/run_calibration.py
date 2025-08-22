@@ -1,51 +1,97 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
-from tesikaga_lidar_detector.srv import TriggerCalibration
+from std_srvs.srv import Empty, Trigger
 import sys
 
-class CalibrationClient(Node):
+class CalibrationController(Node):
     def __init__(self):
-        super().__init__('calibration_client')
-        self.client = self.create_client(TriggerCalibration, '/tesikaga_calibrator/trigger_calibration')
-        while not self.client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Calibration service not available, waiting again...')
-        self.req = TriggerCalibration.Request()
+        super().__init__('calibration_controller')
+        self.bg_client = self.create_client(Empty, '/tesikaga_detector/capture_background')
+        self.add_point_client = self.create_client(Trigger, '/tesikaga_calibrator/add_calibration_point')
+        self.calculate_client = self.create_client(Trigger, '/tesikaga_calibrator/calculate_transform')
+        self.clear_client = self.create_client(Trigger, '/tesikaga_calibrator/clear_calibration')
 
-    def send_request(self):
-        self.future = self.client.call_async(self.req)
-        rclpy.spin_until_future_complete(self, self.future)
-        return self.future.result()
+        self.wait_for_services()
+
+    def wait_for_services(self):
+        self.get_logger().info("Waiting for calibration services...")
+        if not self.bg_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error("Background capture service not available. Is detector_node running?")
+            sys.exit(1)
+        if not self.add_point_client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error("Add point service not available. Is calibration_node running?")
+            sys.exit(1)
+        self.get_logger().info("All services are available.")
+
+    def call_service(self, client, request):
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        try:
+            return future.result()
+        except Exception as e:
+            self.get_logger().error(f"Service call failed: {e}")
+            return None
 
 def main():
-    print("--- 屈斜路の響き - LiDARキャリブレーションシステム ---")
-    print("1. 3本のペットボトルが正しく配置されていることを確認してください。")
-    print("2. RViz2などで、LiDARが3つの物体のみを検出していることを確認してください。")
-    
-    while True:
-        confirm = input("準備が完了したら 'y' を入力してキャリブレーションを実行します (nで中止): ").lower()
-        if confirm == 'n':
-            print("キャリブレーションを中止しました。")
-            sys.exit(0)
-        if confirm == 'y':
-            break
-        else:
-            print("無効な入力です。'y' または 'n' を入力してください。")
-
     rclpy.init()
-    calib_client = CalibrationClient()
+    controller = CalibrationController()
+
+    print("\n--- 屈斜路の響き - 新・対話型キャリブレーションシステム ---")
+
+    # Step 1: 背景キャプチャ
+    print("\n[Step 1/3] 背景のキャプチャ")
+    print("エリア内に人間や障害物がない状態にしてください。")
+    if input("準備ができたら 'y' を入力して背景キャプチャを開始します: ").lower() != 'y':
+        print("中止しました。")
+        sys.exit(0)
     
-    print("\nキャリブレーションサービスを呼び出しています...")
-    response = calib_client.send_request()
+    print("背景をキャプチャ中です...")
+    controller.call_service(controller.bg_client, Empty.Request())
+    print("背景のキャプチャが完了しました。")
 
-    if response.success:
-        calib_client.get_logger().info("--- キャリブレーション成功！ ---")
-        print("\n" + response.message) # ノードからの詳細なメッセージを表示
+    # Step 2: 3点の登録
+    print("\n[Step 2/3] マーカー位置の登録")
+    points_registered = 0
+    while points_registered < 3:
+        print(f"\n--- ポイント {points_registered + 1} の登録 ---")
+        print(f"マーカー{points_registered + 1}の位置に一人だけ立ってください。")
+        action = input(f"準備ができたら 'y' を、最初からやり直す場合は 'r' を入力: ").lower()
+
+        if action == 'r':
+            print("すべての登録済みポイントをクリアします。")
+            controller.call_service(controller.clear_client, Trigger.Request())
+            points_registered = 0
+            continue
+        if action != 'y':
+            print("無効な入力です。")
+            continue
+
+        response = controller.call_service(controller.add_point_client, Trigger.Request())
+        if response and response.success:
+            print(f"成功: {response.message}")
+            points_registered += 1
+        else:
+            print(f"失敗: {response.message if response else 'サービス呼び出しに失敗しました。'}")
+            print("もう一度試してください。")
+
+    # Step 3: 計算
+    print("\n[Step 3/3] 変換行列の計算")
+    print("3点の登録が完了しました。")
+    if input("変換行列を計算しますか？ 'y' を入力: ").lower() != 'y':
+        print("計算を中止しました。")
+        sys.exit(0)
+
+    print("計算を実行中...")
+    response = controller.call_service(controller.calculate_client, Trigger.Request())
+    if response and response.success:
+        print(f"\n--- キャリブレーション成功！ ---")
+        print(response.message)
     else:
-        calib_client.get_logger().error("--- キャリブレーション失敗 ---")
-        print("\n" + response.message)
+        print(f"\n--- キャリブレーション失敗 ---")
+        print(response.message if response else 'サービス呼び出しに失敗しました。')
 
-    calib_client.destroy_node()
+    controller.destroy_node()
     rclpy.shutdown()
 
 if __name__ == "__main__":
