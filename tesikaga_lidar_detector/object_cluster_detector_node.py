@@ -15,6 +15,9 @@ from sensor_msgs.msg import PointCloud2
 from std_srvs.srv import Empty
 import open3d as o3d
 import numpy as np
+import yaml
+import os
+from ament_index_python.packages import get_package_share_directory
 
 from .ros_utils import pointcloud2_to_open3d, open3d_to_pointcloud2
 from .point_cloud_processor import PointCloudProcessor
@@ -56,6 +59,9 @@ class ObjectClusterDetectorNode(Node):
         }
         self.get_logger().info(f"Loaded max_distance: {self.filter_params['max_distance']}")
         
+        # --- 変換行列の読み込み ---
+        self.transform_matrix = self._load_transform_matrix()
+        
         # --- ProcessorとSenderの初期化 ---
         self.processor = PointCloudProcessor(self.get_logger())
         self.udp_sender = UdpSender(
@@ -85,6 +91,41 @@ class ObjectClusterDetectorNode(Node):
         self.get_logger().info("Object Cluster Detector Node has been started.")
         self.get_logger().info(f"Calibration mode: {self.is_calibration_mode}")
         self.get_logger().info(f"Production Voxel Size: {self.voxel_size_production}, Calibration Voxel Size: {self.voxel_size_calibration}")
+
+    def _load_transform_matrix(self):
+        """transform_matrix.yamlから変換行列を読み込む"""
+        try:
+            transform_matrix_file = self.get_parameter('transform_matrix_file').get_parameter_value().string_value
+            package_path = get_package_share_directory('tesikaga_lidar_detector')
+            transform_matrix_path = os.path.join(package_path, 'config', transform_matrix_file)
+            
+            with open(transform_matrix_path, 'r') as f:
+                data = yaml.safe_load(f)
+            
+            matrix = np.array(data['transformation_matrix'])
+            self.get_logger().info(f"Loaded transformation matrix from {transform_matrix_path}:")
+            self.get_logger().info(f"Matrix shape: {matrix.shape}")
+            self.get_logger().info(f"Matrix:\n{matrix}")
+            return matrix
+            
+        except Exception as e:
+            self.get_logger().error(f"Failed to load transformation matrix: {e}")
+            self.get_logger().warn("Using identity transform (no coordinate transformation)")
+            return np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+
+    def _apply_transform(self, points_2d):
+        """2D点群にアフィン変換を適用する"""
+        if points_2d.shape[0] == 0:
+            return points_2d
+            
+        # 同次座標に変換 [x, y] -> [x, y, 1]
+        ones = np.ones((points_2d.shape[0], 1))
+        homogeneous_points = np.hstack([points_2d, ones])
+        
+        # アフィン変換を適用
+        transformed_points = (self.transform_matrix @ homogeneous_points.T).T
+        
+        return transformed_points
 
 
     def _declare_parameters(self):
@@ -187,10 +228,14 @@ class ObjectClusterDetectorNode(Node):
             active_cluster_params = self.cluster_params_calibration if self.is_calibration_mode else self.cluster_params_production
             centroids, sizes, debug_cluster_clouds = self.processor.find_clusters(combined_pcd, active_cluster_params)
 
-            # --- 5. UDP送信とデバッグ情報のPublish ---
+            # --- 5. 座標変換とUDP送信 ---
             if centroids.size > 0:
-                data_to_send = np.hstack([centroids[:, :2], sizes.reshape(-1, 1)])
+                # LiDAR座標系から池座標系への変換を適用
+                transformed_centroids = self._apply_transform(centroids[:, :2])
+                data_to_send = np.hstack([transformed_centroids, sizes.reshape(-1, 1)])
                 self.udp_sender.send_data(data_to_send.flatten())
+                
+                self.get_logger().info(f"Transformed {len(centroids)} centroids: LiDAR -> World coordinates", throttle_duration_sec=2.0)
 
             header = msg.header
             if 'filtered' in debug_pre_clouds and debug_pre_clouds['filtered'].has_points():
