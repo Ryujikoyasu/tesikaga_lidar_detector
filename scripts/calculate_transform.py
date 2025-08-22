@@ -52,8 +52,7 @@ def main():
             'transformation_matrix': transform_matrix.tolist()
         }
         
-        package_path = get_package_share_directory('tesikaga_lidar_detector')
-        output_path = os.path.join(package_path, 'config', 'transform_matrix.yaml')
+        output_path = '/home/ryuddi/ros2_ws/src/tesikaga_lidar_detector/config/transform_matrix.yaml'
         with open(output_path, 'w') as f:
             yaml.dump(output_data, f, indent=2, sort_keys=False)
             
@@ -62,11 +61,12 @@ def main():
         print(f"LiDAR rotation: {np.rad2deg(theta_rad):.1f}°")
         
         # キャリブレーションポイントファイルを削除（次回用）
-        try:
-            os.remove(calib_file)
-            print("Calibration points cleared for next calibration.")
-        except FileNotFoundError:
-            pass
+        # try:
+        #     os.remove(calib_file)
+        #     print("Calibration points cleared for next calibration.")
+        # except FileNotFoundError:
+        #     pass
+        print("Calibration points preserved in:", calib_file)
         
     except Exception as e:
         print(f"Error during calculation: {e}")
