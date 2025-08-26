@@ -1,6 +1,12 @@
 # お花の池、小鳥の森 - LiDAR検出システム
 
+![Demo](assets/demo.gif)
+
 「お花の池、小鳥の森」アート作品のためのLiDAR人間検出・座標変換システム。LiDARで来場者を検出し、鳥のインタラクションシミュレーションと連携します。
+
+## 関連プロジェクト
+
+- **[tesikaga-art](https://github.com/Ryujikoyasu/tesikaga-art)**: ALifeシミュレーション環境とLED制御システム
 
 ## システム概要
 
@@ -53,6 +59,16 @@ ros2 service call /tesikaga_detector/capture_background std_srvs/srv/Empty
 ### 3. 出力確認
 
 検出された人間座標がUDP（127.0.0.1:9999）で配信されます。
+
+### 4. アート作品システムとの連携
+
+```bash
+# tesikaga-artプロジェクトでALifeシミュレーション・LED制御を起動
+cd ~/path/to/tesikaga-art
+python main_real.py
+```
+
+[tesikaga-art](https://github.com/Ryujikoyasu/tesikaga-art)がUDP座標を受信し、鳥の行動シミュレーションとLED制御を実行します。
 
 ## 設定ファイル
 
